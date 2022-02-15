@@ -79,15 +79,24 @@ def zcdp_eps(rho, delta):
     return rho + 2*np.sqrt(rho*np.log(1/delta))
 
 
-def run_experiment(model, train_loader, rho_i, epochs, input_bound, grad_bound):
+def run_experiment(model, train_loader, rho_i, epochs, input_bound, grad_bound, fix=None):
     model.to('cuda')
     #model.network.to('cuda')
     model_criterion = nn.NLLLoss()
     model_optimizer = optim.Adam(model.parameters(), lr=0.01)#, weight_decay=0.0001)
     total_rho = 0
-    
-    clamp_grad_lweird = get_clamp_func('lweird', grad_bound)
-    clamp_grad_l2 = get_clamp_func('l2', grad_bound)
+  
+    if fix is None:
+        clamp_grad_lweird = get_clamp_func('lweird', grad_bound)
+        clamp_grad_l2 = get_clamp_func('l2', grad_bound)
+    elif fix == "inner":
+        clamp_grad_lweird = get_clamp_func('lweird', grad_bound / train_loader.batch_size)
+        clamp_grad_l2 = get_clamp_func('l2', grad_bound / train_loader.batch_size)
+    elif fix == "outer":
+        clamp_grad_lweird = get_clamp_func('lweird', grad_bound)
+        clamp_grad_l2 = get_clamp_func('l2', grad_bound)
+    else:
+        raise ValueError("fix must be in (None, 'inner', 'outer')")
     clamp_input = get_clamp_func('input', input_bound)
     
     for x in model.l1_clip:
@@ -110,7 +119,14 @@ def run_experiment(model, train_loader, rho_i, epochs, input_bound, grad_bound):
     
     model.train()
     # sensitivity for everything with weights is just:
-    sensitivity = input_bound * grad_bound / train_loader.batch_size
+    if fix is None:
+        sensitivity = input_bound * grad_bound / train_loader.batch_size
+    elif fix == "inner":
+        sensitivity = input_bound * grad_bound / train_loader.batch_size
+    elif fix == "outer":
+        sensitivity = input_bound * grad_bound
+    else:
+        raise ValueError("fix must be in (None, 'inner', 'outer')")
     sigma = np.sqrt(sensitivity**2 / (2*rho_i))
     print('sensitivity:', sensitivity)
     

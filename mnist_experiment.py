@@ -1,4 +1,6 @@
 
+import os
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -58,22 +60,29 @@ class Classifier(nn.Module):
         return self.network(x)
     
 
+def main():
+    for BATCH_SIZE in [512, 1024, 2048, 4096]:
+        train_loader = torch.utils.data.DataLoader(dataset1, batch_size=BATCH_SIZE)
+        test_loader = torch.utils.data.DataLoader(dataset2, batch_size=BATCH_SIZE)
+        for epochs in [15, 25, 40, 100]:
+            for grad_clip in [0.00001, 0.0001, 0.001, 0.01, 0.1]:
+                for inp_clip in [0.1, 1, 5, 10]:
+                    for rho_i in [0.00001, 0.00005, 0.0001]:
+                        for fix in [None, "inner", "outer"]:
+                            model, info = uc.run_experiment(Classifier(), 
+                                                        train_loader,
+                                                        rho_i,
+                                                        epochs,
+                                                        inp_clip,
+                                                        grad_clip,
+                                                        fix
+                                                    )
+                            tl, correct, set_len = uc.test(model, test_loader)
+                            path = f'MNIST_{BATCH_SIZE}_{epochs}_{grad_clip}_{inp_clip}_{rho_i}_{fix}_fix.p'
+                            print(path, correct/set_len)
+                            with open(os.path.join("results", path), "wb") as f:
+                                pickle.dump((info, tl, correct), f)
 
-for BATCH_SIZE in [512, 1024, 2048, 4096]:
-    train_loader = torch.utils.data.DataLoader(dataset1, batch_size=BATCH_SIZE)
-    test_loader = torch.utils.data.DataLoader(dataset2, batch_size=BATCH_SIZE)
-    for epochs in [15, 25, 40, 100]:
-        for grad_clip in [0.00001, 0.0001, 0.001, 0.01, 0.1]:
-            for inp_clip in [0.1, 1, 5, 10]:
-                for rho_i in [0.00001, 0.00005, 0.0001]:
-                    model, info = uc.run_experiment(Classifier(), 
-                                                train_loader,
-                                                rho_i,
-                                                epochs,
-                                                inp_clip,
-                                                grad_clip
-                                            )
-                    tl, correct, set_len = uc.test(model, test_loader)
-                    print(f'MNIST_{BATCH_SIZE}_{epochs}_{grad_clip}_{inp_clip}_{rho_i}', correct/set_len)
-                    pickle.dump((info, tl, correct), open(f'MNIST_{BATCH_SIZE}_{epochs}_{grad_clip}_{inp_clip}_{rho_i}.p', 'wb'))
-                
+
+if __name__ == "__main__":
+    main()
